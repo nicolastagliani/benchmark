@@ -246,11 +246,11 @@ BENCHMARK(BM_test)->Unit(benchmark::kMillisecond);
 #endif
 
 #if defined(__GNUC__) || __has_builtin(__builtin_unreachable)
-  #define BENCHMARK_UNREACHABLE() __builtin_unreachable()
+#define BENCHMARK_UNREACHABLE() __builtin_unreachable()
 #elif defined(_MSC_VER)
-  #define BENCHMARK_UNREACHABLE() __assume(false)
+#define BENCHMARK_UNREACHABLE() __assume(false)
 #else
-  #define BENCHMARK_UNREACHABLE() ((void)0)
+#define BENCHMARK_UNREACHABLE() ((void)0)
 #endif
 
 namespace benchmark {
@@ -921,6 +921,9 @@ class Benchmark {
   // Equivalent to ThreadRange(NumCPUs(), NumCPUs())
   Benchmark* ThreadPerCpu();
 
+  // sets the baseline of this benchmark
+  Benchmark* SetBaseline(const char* baseline_name);
+
   virtual void Run(State& state) = 0;
 
   // Used inside the benchmark implementation
@@ -938,7 +941,7 @@ class Benchmark {
 
   std::string name_;
   AggregationReportMode aggregation_report_mode_;
-  std::vector<std::string> arg_names_;       // Args for all benchmark runs
+  std::vector<std::string> arg_names_;      // Args for all benchmark runs
   std::vector<std::vector<int64_t> > args_;  // Args for all benchmark runs
   TimeUnit time_unit_;
   int range_multiplier_;
@@ -951,6 +954,7 @@ class Benchmark {
   BigOFunc* complexity_lambda_;
   std::vector<Statistics> statistics_;
   std::vector<int> thread_counts_;
+  std::string baseline_;
 
   Benchmark& operator=(Benchmark const&);
 };
@@ -1088,6 +1092,14 @@ class Fixture : public internal::Benchmark {
   BENCHMARK_PRIVATE_DECLARE(n) =                         \
       (::benchmark::internal::RegisterBenchmarkInternal( \
           new ::benchmark::internal::FunctionBenchmark(#n, n)))
+
+#define Baseline(b) SetBaseline(#b)
+
+#define Baseline_F(BaseClass, Method) SetBaseline(#BaseClass "/" #Method)
+
+#ifdef BENCHMARK_HAS_CXX11
+#define Baseline_T(BaseClass, Method, ...) SetBaseline(#BaseClass "<" #__VA_ARGS__ ">/" #Method);
+#endif
 
 // Old-style macros
 #define BENCHMARK_WITH_ARG(n, a) BENCHMARK(n)->Arg((a))
@@ -1296,6 +1308,7 @@ class BenchmarkReporter {
     CPUInfo const& cpu_info;
     // The number of chars in the longest benchmark name.
     size_t name_field_width;
+    bool report_baseline;
     static const char* executable_name;
     Context();
   };
@@ -1310,6 +1323,8 @@ class BenchmarkReporter {
           time_unit(kNanosecond),
           real_accumulated_time(0),
           cpu_accumulated_time(0),
+          index(0),
+          baseline_index(0),
           bytes_per_second(0),
           items_per_second(0),
           max_heapbytes_used(0),
@@ -1333,6 +1348,9 @@ class BenchmarkReporter {
     TimeUnit time_unit;
     double real_accumulated_time;
     double cpu_accumulated_time;
+
+    size_t index;
+    size_t baseline_index;
 
     // Return a value representing the real time per iteration in the unit
     // specified by 'time_unit'.
@@ -1422,8 +1440,18 @@ class BenchmarkReporter {
   // 'context'.
   // REQUIRES: 'out' is non-null.
   static void PrintBasicContext(std::ostream* out, Context const& context);
-
+  
+  // Called before every ReportRuns with the same contents that are stored in a local array.
+    // It is used to cross reference results while displaying the current ones
+  void AppendCompletedRuns(const std::vector<Run>& r);
+    
+    // Support function to retrieve a run from the pool of the previously executed reports
+    // the run is returned according to the one that matches the .index field in each run
+    // and in case of no match a nullptr is returned. This should return a std::optional in the future
+  const Run * GetRunWithIndex(const size_t run_index);
+    
  private:
+  std::vector<Run> completed_runs_;
   std::ostream* output_stream_;
   std::ostream* error_stream_;
 };
@@ -1443,19 +1471,23 @@ class ConsoleReporter : public BenchmarkReporter {
       : output_options_(opts_),
         name_field_width_(0),
         prev_counters_(),
-        printed_header_(false) {}
+        printed_header_(false),
+        report_baseline_(false){}
 
   virtual bool ReportContext(const Context& context);
   virtual void ReportRuns(const std::vector<Run>& reports);
 
+
  protected:
   virtual void PrintRunData(const Run& report);
+
   virtual void PrintHeader(const Run& report);
 
   OutputOptions output_options_;
   size_t name_field_width_;
   UserCounters prev_counters_;
   bool printed_header_;
+  bool report_baseline_;
 };
 
 class JSONReporter : public BenchmarkReporter {
@@ -1471,15 +1503,17 @@ class JSONReporter : public BenchmarkReporter {
   bool first_report_;
 };
 
-class BENCHMARK_DEPRECATED_MSG("The CSV Reporter will be removed in a future release")
-      CSVReporter : public BenchmarkReporter {
+class BENCHMARK_DEPRECATED_MSG(
+    "The CSV Reporter will be removed in a future release") CSVReporter
+    : public BenchmarkReporter {
  public:
   CSVReporter() : printed_header_(false) {}
   virtual bool ReportContext(const Context& context);
   virtual void ReportRuns(const std::vector<Run>& reports);
-
+        
  private:
   void PrintRunData(const Run& report);
+
 
   bool printed_header_;
   std::set<std::string> user_counter_names_;

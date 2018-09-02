@@ -66,11 +66,28 @@ void BenchmarkReporter::PrintBasicContext(std::ostream *out,
          "affected.\n";
 #endif
 }
+    
+    const BenchmarkReporter::Run * BenchmarkReporter::GetRunWithIndex(const size_t run_index)
+    {
+        const auto it = std::find_if(completed_runs_.begin(), completed_runs_.end(), [&run_index](const Run& r){
+            return r.index == run_index;
+        });
+        if (it != completed_runs_.end()){
+            return &(*it);
+        } else {
+            return nullptr;
+        }
+    }
 
+    void BenchmarkReporter::AppendCompletedRuns(const std::vector<Run>& r){
+        completed_runs_.reserve(completed_runs_.size() + r.size());
+        completed_runs_.insert(completed_runs_.end(), r.begin(), r.end());
+    }
+    
 // No initializer because it's already initialized to NULL.
 const char *BenchmarkReporter::Context::executable_name;
 
-BenchmarkReporter::Context::Context() : cpu_info(CPUInfo::Get()) {}
+BenchmarkReporter::Context::Context() : cpu_info(CPUInfo::Get()), report_baseline(false) {}
 
 double BenchmarkReporter::Run::GetAdjustedRealTime() const {
   double new_time = real_accumulated_time * GetTimeUnitMultiplier(time_unit);

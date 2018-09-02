@@ -131,6 +131,9 @@ add_test(user_counters_tabular_test user_counters_tabular_test --benchmark_count
 compile_output_test(user_counters_thousands_test)
 add_test(user_counters_thousands_test user_counters_thousands_test --benchmark_min_time=0.01)
 
+compile_output_test(baseline_test)
+add_test(baseline_test baseline_test --benchmark_min_time=0.01)
+
 check_cxx_compiler_flag(-std=c++03 BENCHMARK_HAS_CXX03_FLAG)
 if (BENCHMARK_HAS_CXX03_FLAG)
   compile_benchmark_test(cxx03_test)

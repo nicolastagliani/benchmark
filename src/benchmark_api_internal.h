@@ -31,6 +31,9 @@ struct Benchmark::Instance {
   double min_time;
   size_t iterations;
   int threads;  // Number of concurrent threads to us
+  std::string baseline;
+  size_t index{0};
+  size_t baseline_index{0};
 };
 
 bool FindBenchmarksInternal(const std::string& re,

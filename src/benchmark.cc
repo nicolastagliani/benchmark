@@ -130,6 +130,9 @@ BenchmarkReporter::Run CreateRunReport(
   report.iterations = results.iterations;
   report.time_unit = b.time_unit;
 
+  report.index = b.index;
+  report.baseline_index = b.baseline_index;
+
   if (!report.error_occurred) {
     double bytes_per_second = 0;
     if (results.bytes_processed > 0 && seconds > 0.0) {
@@ -194,10 +197,14 @@ void RunInThread(const benchmark::internal::Benchmark::Instance* b,
 }
 
 std::vector<BenchmarkReporter::Run> RunBenchmark(
-    const benchmark::internal::Benchmark::Instance& b,
+    const std::vector<benchmark::internal::Benchmark::Instance>&
+        benchmark_instances,
+    unsigned int instance_index,
     std::vector<BenchmarkReporter::Run>* complexity_reports) {
   std::vector<BenchmarkReporter::Run> reports;  // return value
 
+  const benchmark::internal::Benchmark::Instance& b =
+      benchmark_instances[instance_index];
   const bool has_explicit_iteration_count = b.iterations != 0;
   size_t iters = has_explicit_iteration_count ? b.iterations : 1;
   std::unique_ptr<internal::ThreadManager> manager;
@@ -350,7 +357,7 @@ State::State(size_t max_iters, const std::vector<int64_t>& ranges, int thread_i,
   // which must be suppressed.
 #if defined(__INTEL_COMPILER)
 #pragma warning push
-#pragma warning(disable:1875)
+#pragma warning(disable : 1875)
 #elif defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
@@ -433,11 +440,14 @@ void RunBenchmarks(const std::vector<Benchmark::Instance>& benchmarks,
   bool has_repetitions = FLAGS_benchmark_repetitions > 1;
   size_t name_field_width = 10;
   size_t stat_field_width = 0;
+  bool report_baseline = false;
   for (const Benchmark::Instance& benchmark : benchmarks) {
     name_field_width =
         std::max<size_t>(name_field_width, benchmark.name.size());
     has_repetitions |= benchmark.repetitions > 1;
-
+    if (benchmark.index != benchmark.baseline_index){
+        report_baseline = true;
+    }
     for (const auto& Stat : *benchmark.statistics)
       stat_field_width = std::max<size_t>(stat_field_width, Stat.name_.size());
   }
@@ -446,6 +456,7 @@ void RunBenchmarks(const std::vector<Benchmark::Instance>& benchmarks,
   // Print header here
   BenchmarkReporter::Context context;
   context.name_field_width = name_field_width;
+  context.report_baseline = report_baseline;
 
   // Keep track of running times of all instances of current benchmark
   std::vector<BenchmarkReporter::Run> complexity_reports;
@@ -462,11 +473,14 @@ void RunBenchmarks(const std::vector<Benchmark::Instance>& benchmarks,
       (!file_reporter || file_reporter->ReportContext(context))) {
     flushStreams(display_reporter);
     flushStreams(file_reporter);
-    for (const auto& benchmark : benchmarks) {
-      std::vector<BenchmarkReporter::Run> reports =
-          RunBenchmark(benchmark, &complexity_reports);
+    for (unsigned int i = 0; i < benchmarks.size(); ++i) {
+      std::vector<BenchmarkReporter::Run> reports = RunBenchmark(benchmarks, i, &complexity_reports);
+      display_reporter->AppendCompletedRuns(reports);
       display_reporter->ReportRuns(reports);
-      if (file_reporter) file_reporter->ReportRuns(reports);
+        if (file_reporter) {
+            file_reporter->AppendCompletedRuns(reports);
+            file_reporter->ReportRuns(reports);
+        }
       flushStreams(display_reporter);
       flushStreams(file_reporter);
     }
@@ -574,7 +588,33 @@ size_t RunSpecifiedBenchmarks(BenchmarkReporter* display_reporter,
     Err << "Failed to match any benchmarks against regex: " << spec << "\n";
     return 0;
   }
+  for (size_t benchmark_index = 0; benchmark_index < benchmarks.size();
+       benchmark_index++) {
+    auto& current_benchmark = benchmarks[benchmark_index];
 
+    if (!current_benchmark.baseline.empty()) {
+      auto it = std::find_if(
+          benchmarks.begin(), benchmarks.begin() + benchmark_index,
+          [&current_benchmark](const internal::Benchmark::Instance& elememnt) {
+            return elememnt.name == current_benchmark.baseline;
+          });
+      if (it != benchmarks.begin() + benchmark_index) {
+        if (current_benchmark.arg == it->arg) {
+          current_benchmark.baseline_index = it->index;
+        } else {
+          Err << "The same parameters must be provided to both "
+              << current_benchmark.name << " and its baseline "
+              << current_benchmark.baseline << " for baseline comparison\n";
+          std::exit(1);
+        }
+      } else {
+        Err << "Benchmark " << current_benchmark.baseline
+            << " must be defined before benchmark " << current_benchmark.name
+            << " for baseline generation\n";
+        std::exit(1);
+      }
+    }
+  }
   if (FLAGS_benchmark_list_tests) {
     for (auto const& benchmark : benchmarks) Out << benchmark.name << "\n";
   } else {

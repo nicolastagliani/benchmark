@@ -149,7 +149,12 @@ bool BenchmarkFamilies::FindBenchmarks(
     // reserve in the special case the regex ".", since we know the final
     // family size.
     if (spec == ".") benchmarks->reserve(family_size);
-
+    auto appendToName = [](Benchmark::Instance& instance, std::string trail) {
+      instance.name += trail;
+      if (!instance.baseline.empty()) {
+        instance.baseline += trail;
+      }
+    };
     for (auto const& args : family->args_) {
       for (int num_threads : *thread_counts) {
         Benchmark::Instance instance;
@@ -168,45 +173,51 @@ bool BenchmarkFamilies::FindBenchmarks(
         instance.complexity_lambda = family->complexity_lambda_;
         instance.statistics = &family->statistics_;
         instance.threads = num_threads;
+        instance.baseline = family->baseline_;
 
         // Add arguments to instance name
         size_t arg_i = 0;
         for (auto const& arg : args) {
-          instance.name += "/";
+          appendToName(instance, "/");
 
           if (arg_i < family->arg_names_.size()) {
             const auto& arg_name = family->arg_names_[arg_i];
             if (!arg_name.empty()) {
-              instance.name +=
-                  StrFormat("%s:", family->arg_names_[arg_i].c_str());
+              appendToName(instance,
+                           StrFormat("%s:", family->arg_names_[arg_i].c_str()));
             }
           }
 
-          instance.name += StrFormat("%d", arg);
+          appendToName(instance, StrFormat("%d", arg));
           ++arg_i;
         }
 
         if (!IsZero(family->min_time_))
-          instance.name += StrFormat("/min_time:%0.3f", family->min_time_);
+          appendToName(instance,
+                       StrFormat("/min_time:%0.3f", family->min_time_));
         if (family->iterations_ != 0)
-          instance.name += StrFormat("/iterations:%d", family->iterations_);
+          appendToName(instance,
+                       StrFormat("/iterations:%d", family->iterations_));
         if (family->repetitions_ != 0)
-          instance.name += StrFormat("/repeats:%d", family->repetitions_);
+          appendToName(instance,
+                       StrFormat("/repeats:%d", family->repetitions_));
 
         if (family->use_manual_time_) {
-          instance.name += "/manual_time";
+          appendToName(instance, "/manual_time");
         } else if (family->use_real_time_) {
-          instance.name += "/real_time";
+          appendToName(instance, "/real_time");
         }
 
         // Add the number of threads used to the name
         if (!family->thread_counts_.empty()) {
-          instance.name += StrFormat("/threads:%d", instance.threads);
+          appendToName(instance, StrFormat("/threads:%d", instance.threads));
         }
 
         if ((re.Match(instance.name) && !isNegativeFilter) ||
             (!re.Match(instance.name) && isNegativeFilter)) {
           instance.last_benchmark_instance = (&args == &family->args_.back());
+          instance.index = benchmarks->size();
+          instance.baseline_index = instance.index;
           benchmarks->push_back(std::move(instance));
         }
       }
@@ -433,6 +444,11 @@ Benchmark* Benchmark::DenseThreadRange(int min_threads, int max_threads,
 
 Benchmark* Benchmark::ThreadPerCpu() {
   thread_counts_.push_back(CPUInfo::Get().num_cpus);
+  return this;
+}
+
+Benchmark* Benchmark::SetBaseline(const char* baseline_name) {
+  baseline_ = baseline_name;
   return this;
 }
 
