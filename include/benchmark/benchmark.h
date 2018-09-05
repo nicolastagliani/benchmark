@@ -1492,7 +1492,7 @@ class ConsoleReporter : public BenchmarkReporter {
 
 class JSONReporter : public BenchmarkReporter {
  public:
-  JSONReporter() : first_report_(true) {}
+  JSONReporter() : first_report_(true), report_baseline_(false) {}
   virtual bool ReportContext(const Context& context);
   virtual void ReportRuns(const std::vector<Run>& reports);
   virtual void Finalize();
@@ -1501,6 +1501,7 @@ class JSONReporter : public BenchmarkReporter {
   void PrintRunData(const Run& report);
 
   bool first_report_;
+  bool report_baseline_;
 };
 
 class BENCHMARK_DEPRECATED_MSG(

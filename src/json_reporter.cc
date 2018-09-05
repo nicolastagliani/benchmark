@@ -65,6 +65,7 @@ int64_t RoundDouble(double v) { return static_cast<int64_t>(v + 0.5); }
 }  // end namespace
 
 bool JSONReporter::ReportContext(const Context& context) {
+  report_baseline_ = context.report_baseline;
   std::ostream& out = GetOutputStream();
 
   out << "{\n";
@@ -188,6 +189,24 @@ void JSONReporter::PrintRunData(Run const& run) {
     out << indent << FormatKV("time_unit", GetTimeUnitString(run.time_unit));
   } else if (run.report_rms) {
     out << indent << FormatKV("rms", run.GetAdjustedCPUTime());
+  }
+  if (report_baseline_){
+      if (run.index != run.baseline_index) {
+          // a baseline benchmark has been provided
+          const Run* baseline_ptr = GetRunWithIndex(run.baseline_index);
+          
+          if (baseline_ptr) {
+              const double baseline_comparison =
+              100.0 / baseline_ptr->iterations *
+              (run.iterations - baseline_ptr->iterations);
+              out << ",\n";
+              out << indent << "\"baseline\": {\n";
+              std::string baseline_indent(8, ' ');
+              out << baseline_indent << FormatKV("percentage_comparison", baseline_comparison) << ",\n";
+              out << baseline_indent << FormatKV("baseline_benchmark", baseline_ptr->benchmark_name) << "\n";
+              out << indent << "}";
+          }
+      }
   }
   if (run.bytes_per_second > 0.0) {
     out << ",\n"
