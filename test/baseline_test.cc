@@ -11,9 +11,8 @@ static void BM_InsertVector(benchmark::State& state) {
     std::vector<int> c;
     for (auto i = state.range(0); --i;) c.push_back(v);
   }
-  const size_t items_processed = state.iterations() * state.range(0);
-  state.SetItemsProcessed(items_processed);
-  state.SetBytesProcessed(items_processed * sizeof(v));
+  state.SetItemsProcessed(state.iterations() * state.range(0));
+  state.SetBytesProcessed(state.iterations() * state.range(0) * sizeof(v));
 }
 
 static void BM_InsertList(benchmark::State& state) {
@@ -22,9 +21,8 @@ static void BM_InsertList(benchmark::State& state) {
     std::list<int> c;
     for (auto i = state.range(0); --i;) c.push_back(v);
   }
-  const size_t items_processed = state.iterations() * state.range(0);
-  state.SetItemsProcessed(items_processed);
-  state.SetBytesProcessed(items_processed * sizeof(v));
+  state.SetItemsProcessed(state.iterations() * state.range(0));
+  state.SetBytesProcessed(state.iterations() * state.range(0) * sizeof(v));
 }
 
 static void BM_InsertSet(benchmark::State& state) {
@@ -33,9 +31,8 @@ static void BM_InsertSet(benchmark::State& state) {
         std::set<int> c;
         for (auto i = state.range(0); --i;) c.insert(v);
     }
-    const size_t items_processed = state.iterations() * state.range(0);
-    state.SetItemsProcessed(items_processed);
-    state.SetBytesProcessed(items_processed * sizeof(v));
+    state.SetItemsProcessed(state.iterations() * state.range(0));
+    state.SetBytesProcessed(state.iterations() * state.range(0) * sizeof(v));
 }
 
 BENCHMARK(BM_InsertVector)->Range(1 << 0, 1 << 10);
