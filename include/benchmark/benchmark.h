@@ -1098,7 +1098,7 @@ class Fixture : public internal::Benchmark {
 #define Baseline_F(BaseClass, Method) SetBaseline(#BaseClass "/" #Method)
 
 #ifdef BENCHMARK_HAS_CXX11
-#define Baseline_T(BaseClass, Method, ...) SetBaseline(#BaseClass "<" #__VA_ARGS__ ">/" #Method);
+#define Baseline_T(BaseClass, Method, ...) SetBaseline(#BaseClass "<" #__VA_ARGS__ ">/" #Method)
 #endif
 
 // Old-style macros
