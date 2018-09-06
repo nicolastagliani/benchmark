@@ -38,7 +38,7 @@ macro(build_external_gtest)
   ExternalProject_Add(googletest
       ${EXCLUDE_FROM_ALL_OPT} ${EXCLUDE_FROM_ALL_VALUE}
       GIT_REPOSITORY https://github.com/google/googletest.git
-      GIT_TAG master
+      GIT_TAG release-1.8.1
       PREFIX "${CMAKE_BINARY_DIR}/googletest"
       INSTALL_DIR "${CMAKE_BINARY_DIR}/googletest"
       CMAKE_CACHE_ARGS
